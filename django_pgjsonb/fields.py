@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models.lookups import BuiltinLookup, Transform
 from django.db.backends.postgresql_psycopg2.schema import DatabaseSchemaEditor
 from django.db.backends.postgresql_psycopg2.introspection import DatabaseIntrospection
+from django.db.backends.utils import names_digest
 from django.utils import six
 from psycopg2.extras import register_default_jsonb, Json
 # we want to be able to use customize decoder to load json, so get avoid the psycopg2's decode json, just return raw text then we deserilize by the field from_db_value
@@ -137,7 +138,7 @@ def patch_index_create():
     DatabaseSchemaEditor.create_jsonb_index_sql = "CREATE INDEX %(name)s ON %(table)s USING GIN ({path}{ops_cls})%(extra)s"
 
     def get_jsonb_index_name(editor, model, field, index_info):
-        return editor._create_index_name(model, [field.name], suffix=editor._digest(index_info.get("path") or ""))
+        return editor._create_index_name(model.__name__, [field.name], suffix=names_digest(index_info.get("path") or "", length=8))
 
     def create_jsonb_index_sql(editor, model, field):
         options = field.db_index_options
@@ -154,7 +155,7 @@ def patch_index_create():
 
             ops_cls = " jsonb_path_ops" if option.get("only_contains") else ""
             sql = editor.create_jsonb_index_sql.format(path=path, ops_cls=ops_cls)
-            sqls[get_jsonb_index_name(editor, model, field, option)] = editor._create_index_sql(model, [field], sql=sql, suffix=(editor._digest(paths) if paths else ""))
+            sqls[get_jsonb_index_name(editor, model, field, option)] = editor._create_index_sql(model, [field], sql=sql, suffix=(names_digest(paths, length=8) if paths else ""))
         return sqls
 
     DatabaseSchemaEditor._create_jsonb_index_sql = create_jsonb_index_sql
